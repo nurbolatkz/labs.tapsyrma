@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+  <rect width="320" height="200" fill="#e7f5fd"/>
+  <rect x="40" y="150" width="240" height="14" rx="5" fill="#9db8c6"/>
+  <g stroke="#a8c4d2" stroke-width="3">
+    <path d="M80 60v74a14 14 0 0 0 28 0V60" fill="#f7fcff"/>
+    <path d="M146 60v74a14 14 0 0 0 28 0V60" fill="#f7fcff"/>
+    <path d="M212 60v74a14 14 0 0 0 28 0V60" fill="#f7fcff"/>
+  </g>
+  <path d="M82 100v34a12 12 0 0 0 24 0v-34z" fill="#17264e"/>
+  <path d="M148 100v34a12 12 0 0 0 24 0v-34z" fill="#8942ad"/>
+  <path d="M214 100v34a12 12 0 0 0 24 0v-34z" fill="#d8a21d"/>
+  <g transform="translate(160 18)">
+    <rect x="-7" y="0" width="14" height="22" rx="6" fill="#3d4f5c"/>
+    <path d="M-5 22h10l-2 30h-6z" fill="#e9f3f8" stroke="#8fb4c5" stroke-width="2"/>
+    <circle cx="0" cy="60" r="4" fill="#9b5a1c"/>
+  </g>
+  <text x="18" y="188" font-family="Segoe UI, Arial" font-size="12" font-weight="700" fill="#176c99">Йод сынамасы · pH · t°</text>
+</svg>

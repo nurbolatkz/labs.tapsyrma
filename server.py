@@ -1,6 +1,7 @@
-"""Shared classroom server for the two standalone biology labs.
+"""Classroom server for the Jasusha Lab biology labs.
 
-Run: python server.py
+Build the React frontend once (cd frontend && npm install && npm run build), then
+run: python server.py
 Open http://127.0.0.1:8000/ and register a teacher account.
 """
 from __future__ import annotations
@@ -27,17 +28,41 @@ ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 DB = DATA / "classroom.sqlite3"
 PASSWORD_FILE = DATA / "teacher-password.txt"
-STATIC = {
-    "/": "index.html",
-    "/index.html": "index.html",
-    "/teacher.html": "teacher.html",
-    "/preview.html": "preview.html",
-    "/fermentter_zhumys_paragy.html": "fermentter_zhumys_paragy.html",
+FRONTEND = ROOT / "frontend" / "dist"
+MIME = {
+    ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+    ".json": "application/json; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
+    ".webp": "image/webp", ".ico": "image/x-icon", ".mp3": "audio/mpeg", ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8",
 }
-MIME = {".html": "text/html; charset=utf-8"}
 LOCK = threading.RLock()
 OSMOSIS_ANSWERS = {"q1": "out", "q2": "vacuole", "q3": "deplasmolysis"}
 ENZYME_COLORS = {"ph1": "blue", "ph2": "purple", "ph3": "gold", "tempA": "blue", "tempAe": "blue", "tempB": "gold"}
+DEFAULT_TITLES = {
+    "osmosis": "Өсімдік жасушасындағы осмос",
+    "enzyme": "Ферменттердің белсенділігі: температура және pH",
+    "photosynthesis": "Жарық қарқындылығы және фотосинтез",
+    "mitosis": "Пияз тамыры ұшындағы митоз",
+}
+LAB_KINDS = tuple(DEFAULT_TITLES)
+PHASES = {"prophase", "metaphase", "anaphase", "telophase"}
+# Answer keys for labs scored by validate_generic. Field ids match the task ids in frontend/src/labs/*.js.
+LAB_SPECS = {
+    "photosynthesis": {
+        "hypothesis": {"type": "choice", "options": {"up", "down", "same"}},
+        "bubbles": {"type": "numbers", "rows": {"d10": 46, "d20": 28, "d30": 15, "d40": 9}, "tolerance": 2, "points": 1},
+        "p1": {"type": "choice", "options": {"oxygen", "co2", "nitrogen"}, "answer": "oxygen", "points": 1},
+        "p2": {"type": "choice", "options": {"down", "up", "same"}, "answer": "down", "points": 1},
+        "p3": {"type": "choice", "options": {"bubbles", "light", "water"}, "answer": "light", "points": 1},
+        "p4": {"type": "choice", "options": {"co2", "light", "warm"}, "answer": "co2", "points": 1},
+    },
+    "mitosis": {
+        "identify": {"type": "table", "options": PHASES, "rows": {"a": "metaphase", "b": "prophase", "c": "telophase", "d": "anaphase"}, "points": 2},
+        "order": {"type": "table", "options": PHASES, "rows": {"pos1": "prophase", "pos2": "metaphase", "pos3": "anaphase", "pos4": "telophase"}, "points": 1},
+        "m1": {"type": "choice", "options": {"meristem", "big", "green"}, "answer": "meristem", "points": 1},
+        "m2": {"type": "choice", "options": {"8", "16", "32"}, "answer": "16", "points": 1},
+        "m3": {"type": "choice", "options": {"separate", "line", "membrane"}, "answer": "separate", "points": 1},
+    },
+}
 
 
 def now():
@@ -82,11 +107,7 @@ def password_hash(password, salt):
 
 
 def seed_labs(conn, owner_id):
-    defaults = [
-        ("osmosis", "Өсімдік жасушасындағы осмос"),
-        ("enzyme", "Ферменттердің белсенділігі: температура және pH"),
-    ]
-    for kind, title in defaults:
+    for kind, title in DEFAULT_TITLES.items():
         conn.execute("INSERT INTO labs (id,kind,title,class_name,deadline,is_open,created_at,owner_id) VALUES (?,?,?,?,?,1,?,?)",
                      (secrets.token_urlsafe(9), kind, title, "9 А", None, iso(now()), owner_id))
 
@@ -182,8 +203,10 @@ def validate_submission(kind, data):
         conclusion = clean_text(data.get("conclusion"), "Қорытынды", 20, 3000)
         payload = {"name": name, "className": class_name, "hypothesis": clean_text(data.get("hypothesis"), "Болжам", 1, 300),
                    "captures": clean_captures, "answers": {q: answers[q] for q in allowed}, "conclusion": conclusion}
-        score = sum(answers[q] == answer for q, answer in OSMOSIS_ANSWERS.items())
-        return payload, score, 3
+        checks = {q: answers[q] == answer for q, answer in OSMOSIS_ANSWERS.items()}
+        return payload, sum(checks.values()), 3, checks
+    if kind in LAB_SPECS:
+        return validate_generic(kind, data, name, class_name)
     answers = data.get("answers")
     if not isinstance(answers, dict):
         raise ValueError("Жауаптар қажет.")
@@ -204,15 +227,64 @@ def validate_submission(kind, data):
         conclusion[key] = clean_text(conclusion.get(key), "Қорытынды", 1, 80)
     conclusion["reason"] = clean_text(conclusion.get("reason"), "Себебі", 10, 2000)
     correct_prediction = prediction_ph == "water" and prediction_temp == "warm"
-    score = 1
-    score += int(sum(colors[k] == v for k, v in list(ENZYME_COLORS.items())[:3]) >= 2)
-    score += int(sum(colors[k] == v for k, v in list(ENZYME_COLORS.items())[3:]) >= 2)
-    score += int(normalize(comparison["temperature"]) == "3638" and normalize(comparison["medium"]) == "бейтарап" and normalize(comparison["color"]) == "сарықоңыр")
-    score += int(normalize(conclusion["protein"]) == "нәруыз" and normalize(conclusion["change"]) == "бұзылады")
-    score += int(normalize(conclusion["prediction"]) == ("расталды" if correct_prediction else "расталмады"))
+    protein = normalize(conclusion["protein"]) == "нәруыз" and normalize(conclusion["change"]) == "бұзылады"
+    prediction = normalize(conclusion["prediction"]) == ("расталды" if correct_prediction else "расталмады")
+    checks = {
+        "prediction": True,
+        "colorsPh": sum(colors[k] == v for k, v in list(ENZYME_COLORS.items())[:3]) >= 2,
+        "colorsTemp": sum(colors[k] == v for k, v in list(ENZYME_COLORS.items())[3:]) >= 2,
+        "comparison": normalize(comparison["temperature"]) == "3638" and normalize(comparison["medium"]) == "бейтарап" and normalize(comparison["color"]) == "сарықоңыр",
+        "conclusion": protein and prediction,
+    }
+    score = 1 + checks["colorsPh"] + checks["colorsTemp"] + checks["comparison"] + protein + prediction
     payload = {"name": name, "className": class_name, "answers": {"predictionPh": prediction_ph, "predictionTemp": prediction_temp,
                "colors": {key: colors[key] for key in ENZYME_COLORS}, "comparison": comparison, "conclusion": conclusion}}
-    return payload, score, 6
+    return payload, score, 6, checks
+
+
+def validate_generic(kind, data, name, class_name):
+    """Validates and scores a lab described in LAB_SPECS. Returns (payload, score, max, checks)."""
+    answers = data.get("answers")
+    if not isinstance(answers, dict):
+        raise ValueError("Жауаптар қажет.")
+    clean, checks, score, maximum = {}, {}, 0, 0
+    for field, spec in LAB_SPECS[kind].items():
+        value = answers.get(field)
+        points = spec.get("points", 0)
+        maximum += points
+        if spec["type"] == "choice":
+            if value not in spec["options"]:
+                raise ValueError("Барлық сұраққа жауап беріңіз.")
+            clean[field] = value
+            if "answer" in spec:
+                checks[field] = value == spec["answer"]
+                score += points * checks[field]
+        elif spec["type"] == "table":
+            if not isinstance(value, dict) or any(value.get(row) not in spec["options"] for row in spec["rows"]):
+                raise ValueError("Кестенің барлық жолын толтырыңыз.")
+            clean[field] = {row: value[row] for row in spec["rows"]}
+            correct = sum(value[row] == answer for row, answer in spec["rows"].items())
+            earned = correct * points // len(spec["rows"])
+            checks[field] = correct == len(spec["rows"])
+            score += earned
+        elif spec["type"] == "numbers":
+            if not isinstance(value, dict):
+                raise ValueError("Нәтижелер кестесін толтырыңыз.")
+            numbers = {}
+            for row in spec["rows"]:
+                try:
+                    number = float(str(value.get(row, "")).replace(",", "."))
+                except ValueError as exc:
+                    raise ValueError("Кестеге сан жазыңыз.") from exc
+                if not 0 <= number <= 1000:
+                    raise ValueError("Кестедегі сан 0–1000 аралығында болуы керек.")
+                numbers[row] = int(number) if number.is_integer() else number
+            clean[field] = numbers
+            checks[field] = all(abs(numbers[row] - answer) <= spec["tolerance"] for row, answer in spec["rows"].items())
+            score += points * checks[field]
+    conclusion = clean_text(data.get("conclusion"), "Қорытынды", 20, 3000)
+    payload = {"name": name, "className": class_name, "answers": clean, "conclusion": conclusion}
+    return payload, score, maximum, checks
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -276,27 +348,39 @@ class Handler(BaseHTTPRequestHandler):
         expected = f"http://{self.headers.get('Host')}"
         return origin == expected or origin == expected.replace("http://", "https://", 1)
 
-    def do_GET(self):
-        path = unquote(urlparse(self.path).path)
-        if path in STATIC:
-            file = ROOT / STATIC[path]
-            body = file.read_bytes()
-            self.send_response(200)
-            self.send_header("Content-Type", MIME[file.suffix])
+    def send_static(self, path):
+        """Serves the built React app. Unknown paths without a file extension get index.html (client routing)."""
+        root = FRONTEND.resolve()
+        file = (root / path.lstrip("/")).resolve()
+        if root not in file.parents or not file.is_file():
+            if Path(path).suffix:
+                return self.fail(404, "Файл табылмады.")
+            file = root / "index.html"
+        if not file.is_file():
+            body = ("Frontend жиналмаған. Іске қосу: cd frontend && npm install && npm run build").encode("utf-8")
+            self.send_response(503)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(body)
             return
+        body = file.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", MIME.get(file.suffix.lower(), "application/octet-stream"))
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("X-Content-Type-Options", "nosniff")
+        # Vite fingerprints files in /assets, so they can be cached; everything else is revalidated.
+        self.send_header("Cache-Control", "public, max-age=31536000, immutable" if path.startswith("/assets/") else "no-cache")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        path = unquote(urlparse(self.path).path)
         if not path.startswith("/api/"):
-            return self.fail(404, "Бет табылмады.")
-        if path == "/api/labs":
-            with db() as conn:
-                rows = conn.execute("SELECT * FROM labs ORDER BY created_at").fetchall()
-            return self.send_json(200, {"labs": [lab_json(row) for row in rows], "serverTime": iso(now())})
+            return self.send_static(path)
         if path == "/api/teacher/me":
             teacher = self.teacher()
-            return self.send_json(200 if teacher else 401, {"authenticated": bool(teacher),
+            return self.send_json(200, {"authenticated": bool(teacher),
                 "teacher": {"id": teacher["id"], "name": teacher["name"], "email": teacher["email"]} if teacher else None})
         if path.startswith("/api/labs/") and path.count("/") == 3:
             lab_id = path.split("/")[3]
@@ -306,8 +390,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/teacher/labs":
             if not self.teacher_required(): return
             with db() as conn:
-                rows = conn.execute("SELECT labs.*,COUNT(submissions.id) AS result_count FROM labs LEFT JOIN submissions ON labs.id=submissions.lab_id WHERE labs.owner_id=? GROUP BY labs.id ORDER BY labs.created_at", (self.current_teacher["id"],)).fetchall()
-            return self.send_json(200, {"labs": [{**lab_json(row), "resultCount": row["result_count"]} for row in rows]})
+                rows = conn.execute("SELECT labs.*,COUNT(submissions.id) AS result_count,AVG(submissions.score*100.0/submissions.max_score) AS avg_percent FROM labs LEFT JOIN submissions ON labs.id=submissions.lab_id WHERE labs.owner_id=? GROUP BY labs.id ORDER BY labs.created_at DESC", (self.current_teacher["id"],)).fetchall()
+            return self.send_json(200, {"labs": [{**lab_json(row), "resultCount": row["result_count"], "avgPercent": row["avg_percent"]} for row in rows]})
         parts = path.split("/")
         if len(parts) == 6 and parts[:4] == ["", "api", "teacher", "labs"] and parts[5] in ("results", "results.csv"):
             if not self.teacher_required(): return
@@ -340,7 +424,8 @@ class Handler(BaseHTTPRequestHandler):
             if not self.teacher_required(): return
             with db() as conn:
                 row = conn.execute("SELECT submissions.* FROM submissions JOIN labs ON labs.id=submissions.lab_id WHERE submissions.id=? AND labs.owner_id=?", (parts[4], self.current_teacher["id"])).fetchone()
-            return self.send_json(200, {"result": {"id": row["id"], "labId": row["lab_id"], "name": row["student_name"],
+                lab = conn.execute("SELECT * FROM labs WHERE id=?", (row["lab_id"],)).fetchone() if row else None
+            return self.send_json(200, {"lab": lab_json(lab), "result": {"id": row["id"], "labId": row["lab_id"], "name": row["student_name"],
                 "className": row["class_name"], "score": row["score"], "maxScore": row["max_score"],
                 "submittedAt": row["submitted_at"], "payload": json.loads(row["payload"])}}) if row else self.fail(404, "Есеп табылмады.")
         self.fail(404, "Сұрау табылмады.")
@@ -391,7 +476,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not self.teacher_required(): return
                 if path == "/api/teacher/labs" and method == "POST":
                     kind = data.get("kind")
-                    if kind not in ("osmosis", "enzyme"): raise ValueError("Зертхана түрін таңдаңыз.")
+                    if kind not in LAB_KINDS: raise ValueError("Зертхана түрін таңдаңыз.")
                     title = clean_text(data.get("title"), "Атауы", 2, 120)
                     class_name = clean_text(data.get("className"), "Сынып", 1, 30)
                     deadline = iso(parse_date(data.get("deadline")))
@@ -414,6 +499,11 @@ class Handler(BaseHTTPRequestHandler):
                         row = conn.execute("SELECT * FROM labs WHERE id=? AND owner_id=?", (parts[4], self.current_teacher["id"])).fetchone()
                     return self.send_json(200, {"lab": lab_json(row)}) if result.rowcount else self.fail(404, "Зертхана табылмады.")
             parts = path.split("/")
+            if len(parts) == 5 and parts[:3] == ["", "api", "demo"] and parts[4] == "check" and method == "POST":
+                # Demo mode: score the answers without storing anything, so answer keys never ship to the browser.
+                if parts[3] not in LAB_KINDS: return self.fail(404, "Зертхана табылмады.")
+                _, score, maximum, checks = validate_submission(parts[3], data)
+                return self.send_json(200, {"score": score, "maxScore": maximum, "checks": checks, "saved": False})
             if len(parts) == 5 and parts[:3] == ["", "api", "labs"] and parts[4] == "submissions" and method == "POST":
                 lab_id = parts[3]
                 client_id = data.get("clientId") if isinstance(data, dict) else None
@@ -425,17 +515,19 @@ class Handler(BaseHTTPRequestHandler):
                         lab = conn.execute("SELECT * FROM labs WHERE id=?", (lab_id,)).fetchone()
                         if not lab: return self.fail(404, "Зертхана табылмады.")
                         if client_id:
-                            existing = conn.execute("SELECT id,score,max_score FROM submissions WHERE id=? AND lab_id=?", (client_id, lab_id)).fetchone()
+                            existing = conn.execute("SELECT id,score,max_score,payload FROM submissions WHERE id=? AND lab_id=?", (client_id, lab_id)).fetchone()
                             if existing:
-                                return self.send_json(200, {"id": existing["id"], "score": existing["score"], "maxScore": existing["max_score"], "saved": True})
+                                return self.send_json(200, {"id": existing["id"], "score": existing["score"], "maxScore": existing["max_score"],
+                                                            "checks": json.loads(existing["payload"]).get("checks", {}), "saved": True})
                         if not lab_json(lab)["accepting"]:
                             return self.fail(409, "Тапсыру жабық немесе мерзімі аяқталған.")
-                        payload, score, maximum = validate_submission(lab["kind"], data)
+                        payload, score, maximum, checks = validate_submission(lab["kind"], data)
+                        payload["checks"] = checks
                         submission_id = client_id or secrets.token_urlsafe(15)
                         submitted_at = iso(now())
                         conn.execute("INSERT INTO submissions VALUES (?,?,?,?,?,?,?,?)", (submission_id, lab_id, payload["name"],
                                      payload["className"], score, maximum, json.dumps(payload, ensure_ascii=False), submitted_at))
-                return self.send_json(201, {"id": submission_id, "score": score, "maxScore": maximum, "submittedAt": submitted_at, "saved": True})
+                return self.send_json(201, {"id": submission_id, "score": score, "maxScore": maximum, "checks": checks, "submittedAt": submitted_at, "saved": True})
             self.fail(404, "Сұрау табылмады.")
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self.fail(400, str(exc))
@@ -450,7 +542,9 @@ def main():
     args = parser.parse_args()
     init_db()
     print(f"Classroom: http://{args.host}:{args.port}/", flush=True)
-    print("Teacher cabinet: /teacher.html", flush=True)
+    print("Teacher cabinet: /teacher", flush=True)
+    if not (FRONTEND / "index.html").is_file():
+        print("Frontend is not built yet: cd frontend && npm install && npm run build", flush=True)
     ThreadingHTTPServer((args.host, args.port), Handler).serve_forever()
 
 

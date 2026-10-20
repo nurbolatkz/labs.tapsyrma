@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+  <rect width="320" height="200" fill="#eaf6e8"/>
+  <polygon points="236,62 236,108 150,150 150,40" fill="#fff7c2" opacity=".7"/>
+  <rect x="80" y="30" width="74" height="150" rx="10" fill="#fff" fill-opacity=".5" stroke="#9ab5b8" stroke-width="3"/>
+  <rect x="83" y="46" width="68" height="131" rx="8" fill="#c7e8ec"/>
+  <path d="M117 170V90" stroke="#2f7d3b" stroke-width="4" stroke-linecap="round"/>
+  <g stroke="#3f9a4b" stroke-width="5" fill="none" stroke-linecap="round">
+    <path d="M117 160q-14-4-20-12M117 148q14-4 20-12M117 136q-13-4-18-12M117 124q13-4 18-12M117 112q-11-3-15-10M117 100q11-3 15-10"/>
+  </g>
+  <g fill="#fff" stroke="#8cc3cc"><circle cx="117" cy="80" r="4"/><circle cx="119" cy="66" r="3.5"/><circle cx="116" cy="54" r="3"/></g>
+  <rect x="246" y="78" width="8" height="100" fill="#56646a"/>
+  <path d="M256 54 236 62v46l20 8z" fill="#2f3b40"/>
+  <ellipse cx="236" cy="85" rx="6" ry="23" fill="#fff6b0"/>
+  <rect x="226" y="176" width="48" height="8" rx="3" fill="#3f4b50"/>
+  <text x="18" y="194" font-family="Segoe UI, Arial" font-size="12" font-weight="700" fill="#2f7d3b">O₂ көпіршіктері</text>
+</svg>

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Фотосинтез анимациясы</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: linear-gradient(#f4f8ef, #e7efe0); font-family: "Segoe UI", Arial, sans-serif; }
+  svg { width: 100%; height: 100%; display: block; }
+  text { font-family: "Segoe UI", Arial, sans-serif; }
+</style>
+</head>
+<body>
+<svg viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Элодея салынған стақан және жылжымалы шам">
+  <defs>
+    <radialGradient id="glow" cx="0" cy="0.5" r="1">
+      <stop offset="0" stop-color="#fff7c2" stop-opacity=".95"/><stop offset="1" stop-color="#fff7c2" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d6f0f3"/><stop offset="1" stop-color="#b4dde3"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="430" width="800" height="70" fill="#d9e3cf"/>
+  <polygon id="rays" points="0,0" fill="url(#glow)" opacity=".6"/>
+  <!-- Beaker with Elodea -->
+  <rect x="150" y="90" width="180" height="330" rx="14" fill="#ffffff" fill-opacity=".45" stroke="#9ab5b8" stroke-width="3"/>
+  <rect x="153" y="118" width="174" height="299" rx="11" fill="url(#water)"/>
+  <line x1="153" y1="118" x2="327" y2="118" stroke="#8cc3cc" stroke-width="2"/>
+  <g id="plant" stroke="#2f7d3b" stroke-linecap="round">
+    <path d="M240 400 C238 340 244 290 240 236" stroke-width="5" fill="none"/>
+  </g>
+  <g id="bubbles"></g>
+  <text x="240" y="452" text-anchor="middle" font-size="14" fill="#3c5a3f">Элодея · NaHCO₃ ерітіндісі</text>
+  <!-- Ruler -->
+  <g id="ruler"></g>
+  <!-- Lamp -->
+  <g id="lamp" transform="translate(500 0)">
+    <rect x="-6" y="200" width="12" height="225" fill="#56646a"/>
+    <rect x="-40" y="420" width="80" height="12" rx="4" fill="#3f4b50"/>
+    <path d="M10 180 L-38 156 L-38 254 L10 230 Z" fill="#2f3b40"/>
+    <ellipse id="bulb" cx="-38" cy="205" rx="10" ry="46" fill="#fff6b0"/>
+  </g>
+  <!-- Readouts -->
+  <g transform="translate(560 40)">
+    <rect width="210" height="96" rx="12" fill="#ffffff" stroke="#d3ddcc"/>
+    <text x="16" y="28" font-size="13" fill="#5d725f">Қашықтық</text>
+    <text id="dist" x="194" y="28" font-size="15" font-weight="700" text-anchor="end" fill="#173b25">—</text>
+    <text x="16" y="56" font-size="13" fill="#5d725f">Уақыт</text>
+    <text id="clock" x="194" y="56" font-size="15" font-weight="700" text-anchor="end" fill="#173b25">0:00</text>
+    <text x="16" y="84" font-size="13" fill="#5d725f">Көпіршік саны</text>
+    <text id="count" x="194" y="84" font-size="20" font-weight="700" text-anchor="end" fill="#2f7d3b">0</text>
+  </g>
+</svg>
+<script src="bridge.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = JasushaAnim, NS = "http://www.w3.org/2000/svg";
+  // Bubbles per minute at each lamp distance (cm). Teaching values, rate falls as light weakens.
+  var RATE = { 10: 46, 20: 28, 30: 15, 40: 9 };
+  var $ = function (id) { return document.getElementById(id); };
+  var lampX = 500, distance = null;
+
+  function el(name, attrs, parent) {
+    var n = document.createElementNS(NS, name);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    parent.appendChild(n);
+    return n;
+  }
+
+  // Leaves along the stem.
+  var plant = $("plant");
+  for (var i = 0; i < 12; i++) {
+    var y = 395 - i * 13, side = i % 2 ? 1 : -1, len = 26 - i * 0.8;
+    el("path", { d: "M240 " + y + " q" + side * len * 0.6 + " -10 " + side * len + " -4", "stroke-width": 6, fill: "none", stroke: i % 3 ? "#3f9a4b" : "#2f7d3b" }, plant);
+  }
+  el("circle", { cx: 240, cy: 236, r: 4, fill: "#2f7d3b" }, plant);
+
+  // Ruler from the beaker wall: 1 cm = 10 px.
+  var ruler = $("ruler");
+  el("rect", { x: 330, y: 432, width: 420, height: 22, fill: "#f3e3b5", stroke: "#c9b37a" }, ruler);
+  for (var cm = 0; cm <= 42; cm++) {
+    el("line", { x1: 330 + cm * 10, y1: 432, x2: 330 + cm * 10, y2: cm % 5 ? 438 : 444, stroke: "#7d6a3a" }, ruler);
+    if (cm % 10 === 0) el("text", { x: 330 + cm * 10, y: 470, "text-anchor": "middle", "font-size": 12, fill: "#5d4f2a" }, ruler).textContent = cm + " см";
+  }
+
+  function setLamp(x) {
+    lampX = x;
+    $("lamp").setAttribute("transform", "translate(" + x + " 0)");
+    var d = (x - 330) / 10, strength = Math.min(1, Math.pow(10 / Math.max(d, 10), 1.3));
+    $("rays").setAttribute("points", (x - 38) + ",160 " + (x - 38) + ",250 330,400 330,110");
+    $("rays").setAttribute("opacity", (0.15 + strength * 0.7).toFixed(2));
+    $("bulb").setAttribute("fill", "rgb(255," + Math.round(230 + strength * 16) + "," + Math.round(150 + strength * 40) + ")");
+  }
+  setLamp(500);
+
+  function bubble() {
+    var b = el("circle", { cx: 240 + (Math.random() - 0.5) * 4, cy: 232, r: 3 + Math.random() * 2, fill: "#ffffff", stroke: "#8cc3cc", "stroke-width": 1 }, $("bubbles"));
+    var start = performance.now(), dur = A.reduced ? 300 : 1300;
+    (function rise(now) {
+      var p = Math.min(1, (now - start) / dur);
+      b.setAttribute("cy", 232 - p * 112);
+      b.setAttribute("cx", +b.getAttribute("cx") + Math.sin(now / 90) * 0.15);
+      if (p < 1) requestAnimationFrame(rise); else b.remove();
+    })(start);
+  }
+
+  function count(rate) {
+    // One simulated minute takes 12 seconds; bubbles are spread evenly with a little jitter.
+    var seconds = 60, total = rate, emitted = 0, duration = 12000;
+    var times = [];
+    for (var k = 0; k < total; k++) times.push(((k + 0.5) / total + (A.hash(k + rate) - 0.5) * 0.6 / total));
+    $("count").textContent = "0";
+    return A.tween(duration, function (p) {
+      var s = Math.floor(p * seconds);
+      $("clock").textContent = "0:" + (s < 10 ? "0" : "") + s;
+      while (emitted < total && times[emitted] <= p) { emitted++; bubble(); $("count").textContent = String(emitted); }
+      if (p >= 1) { $("clock").textContent = "1:00"; $("count").textContent = String(total); }
+    });
+  }
+
+  JasushaBridge({
+    run: function (stage) {
+      var d = parseInt(stage.slice(1), 10);
+      if (!RATE[d]) return Promise.resolve();
+      distance = d;
+      $("dist").textContent = d + " см";
+      $("clock").textContent = "0:00";
+      $("count").textContent = "0";
+      var from = lampX, to = 330 + d * 10;
+      return A.tween(1500, function (p) { setLamp(from + (to - from) * A.ease(p)); })
+        .then(function () { return new Promise(function (r) { setTimeout(r, 1200); }); })
+        .then(function () { return count(RATE[d]); })
+        .then(function () { return { distance: d, bubbles: RATE[d] }; });
+    },
+    restore: function () {
+      $("dist").textContent = distance ? distance + " см" : "—";
+    },
+  });
+})();
+</script>
+</body>
+</html>

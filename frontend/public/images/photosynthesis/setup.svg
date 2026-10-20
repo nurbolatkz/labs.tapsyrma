@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 240" font-family="Segoe UI, Arial" font-size="12">
+  <rect width="560" height="240" fill="#fff"/>
+  <polygon points="420,70 420,130 150,180 150,40" fill="#fff7c2" opacity=".7"/>
+  <rect x="70" y="30" width="80" height="170" rx="10" fill="#fff" stroke="#9ab5b8" stroke-width="3"/>
+  <rect x="73" y="48" width="74" height="149" rx="8" fill="#c7e8ec"/>
+  <path d="M110 190V100" stroke="#2f7d3b" stroke-width="4" stroke-linecap="round"/>
+  <g stroke="#3f9a4b" stroke-width="5" fill="none" stroke-linecap="round"><path d="M110 178q-14-4-20-12M110 164q14-4 20-12M110 150q-13-4-18-12M110 136q13-4 18-12M110 122q-11-3-15-10"/></g>
+  <g fill="#fff" stroke="#8cc3cc"><circle cx="110" cy="88" r="4"/><circle cx="112" cy="72" r="3.5"/><circle cx="109" cy="58" r="3"/></g>
+  <rect x="434" y="96" width="8" height="110" fill="#56646a"/><path d="M444 60 420 70v60l24 10z" fill="#2f3b40"/><ellipse cx="420" cy="100" rx="7" ry="28" fill="#fff6b0"/>
+  <rect x="150" y="206" width="300" height="18" fill="#f3e3b5" stroke="#c9b37a"/>
+  <g stroke="#7d6a3a"><path d="M150 206v10M225 206v10M300 206v10M375 206v10M450 206v10"/></g>
+  <g fill="#5d4f2a" text-anchor="middle"><text x="150" y="236">0</text><text x="225" y="236">10</text><text x="300" y="236">20</text><text x="375" y="236">30</text><text x="450" y="236">40 см</text></g>
+  <g fill="#3a4a44">
+    <text x="166" y="58">← O₂ көпіршіктері</text>
+    <text x="166" y="150">← Элодея + NaHCO₃ ерітіндісі</text>
+    <text x="456" y="56">Шам</text>
+  </g>
+</svg>

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Осмос анимациясы</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: radial-gradient(ellipse at 50% 45%, #e0e8dc 0%, #edf1e9 50%, #f5f7f2 80%); font-family: "Segoe UI", Arial, sans-serif; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .chip { position: absolute; left: 12px; bottom: 12px; background: #ffffffe0; border: 1px solid #d8e2d5; border-radius: 8px; padding: 6px 10px; font-size: 12px; color: #33463c; }
+  .chip b { color: #8a3d73; }
+  .badge { position: absolute; left: 12px; top: 10px; font-size: 11px; color: #6c7d68; line-height: 1.5; }
+  .badge b { display: block; color: #3e5640; font-size: 12px; }
+</style>
+</head>
+<body>
+<canvas id="view" role="img" aria-label="Қызыл пияз жасушаларының микроскоптағы моделі"></canvas>
+<div class="badge">ПРЕПАРАТ № 01<b>Қызыл пияз эпидермисі · 400×</b></div>
+<div class="chip" id="chip">Орта: <b>таза су</b> · Су: тепе-теңдік</div>
+<script src="bridge.js"></script>
+<script>
+(function () {
+  "use strict";
+  var A = JasushaAnim, hash = A.hash;
+  var canvas = document.getElementById("view"), chip = document.getElementById("chip");
+  var state = { shrink: 0, flow: 0, labels: true, medium: "water", concentration: 4 };
+
+  function saltShrink(c) { return 0.27 + Number(c || 4) * 0.045; }
+
+  function setChip(medium, water) {
+    chip.innerHTML = "Орта: <b>" + medium + "</b> · Су: " + water;
+  }
+
+  function polygon(ctx, pts, round) {
+    var n = pts.length;
+    ctx.beginPath();
+    for (var i = 0; i < n; i++) {
+      var a = pts[(i + n - 1) % n], b = pts[i], c = pts[(i + 1) % n];
+      var p = [b[0] + (a[0] - b[0]) * round, b[1] + (a[1] - b[1]) * round];
+      var q = [b[0] + (c[0] - b[0]) * round, b[1] + (c[1] - b[1]) * round];
+      if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
+      ctx.quadraticCurveTo(b[0], b[1], q[0], q[1]);
+    }
+    ctx.closePath();
+  }
+
+  function draw(now) {
+    var f = A.fit(canvas), ctx = f.ctx, w = f.w, h = f.h;
+    ctx.clearRect(0, 0, w, h);
+    var R = Math.min(w, h) * 0.46, cxv = w / 2, cyv = h / 2;
+
+    // Eyepiece ring.
+    ctx.beginPath(); ctx.arc(cxv, cyv, R + 10, 0, Math.PI * 2);
+    var ring = ctx.createLinearGradient(cxv - R, cyv - R, cxv + R, cyv + R);
+    ring.addColorStop(0, "#667269"); ring.addColorStop(0.3, "#263a31"); ring.addColorStop(0.7, "#1e2c27"); ring.addColorStop(1, "#a1afa0");
+    ctx.fillStyle = ring; ctx.fill();
+
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cxv, cyv, R, 0, Math.PI * 2); ctx.clip();
+    var bg = ctx.createRadialGradient(cxv - R * 0.3, cyv - R * 0.35, 3, cxv, cyv, R * 1.2);
+    bg.addColorStop(0, "#f6e7e6"); bg.addColorStop(0.6, "#e1b7cf"); bg.addColorStop(1, "#b88bb3");
+    ctx.fillStyle = bg; ctx.fillRect(cxv - R, cyv - R, R * 2, R * 2);
+
+    ctx.translate(cxv, cyv); ctx.rotate(-0.27);
+    var cw = R * 0.62, ch = R * 0.37, shrink = state.shrink, selected = null;
+    for (var row = -5; row <= 5; row++) {
+      for (var col = -4; col <= 4; col++) {
+        var id = (row + 10) * 33 + col + 10, cx = col * cw + (row % 2 ? cw * 0.48 : 0), cy = row * ch;
+        if (Math.abs(cx) > R * 1.4 || Math.abs(cy) > R * 1.4) continue;
+        var raw = [[-.49,-.37],[-.34,-.49],[.37,-.47],[.5,-.28],[.49,.34],[.32,.48],[-.38,.47],[-.51,.27]];
+        var pts = raw.map(function (p, i) { return [cx + (p[0] + (hash(id + i + 100) - .5) * .06) * cw, cy + (p[1] + (hash(id + i + 200) - .5) * .05) * ch]; });
+        polygon(ctx, pts, .15);
+        ctx.fillStyle = "rgba(255,240,228,.58)"; ctx.fill();
+        ctx.strokeStyle = "#9d647d"; ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.strokeStyle = "rgba(255,253,227,.9)"; ctx.lineWidth = .75; ctx.stroke();
+        var factor = 1 - shrink * (.8 + hash(id) * .2);
+        var inside = pts.map(function (p) { return [cx + (p[0] - cx) * factor * .94, cy + (p[1] - cy) * factor * .9]; });
+        polygon(ctx, inside, shrink > .15 ? .49 : .2);
+        var gel = ctx.createLinearGradient(cx - cw * .4, cy - ch * .4, cx + cw * .4, cy + ch * .5);
+        gel.addColorStop(0, "rgba(205,92,151," + (.22 + shrink * .5) + ")");
+        gel.addColorStop(.6, "rgba(161,57,126," + (.3 + shrink * .55) + ")");
+        gel.addColorStop(1, "rgba(105,47,112," + (.3 + shrink * .45) + ")");
+        ctx.fillStyle = gel; ctx.fill();
+        ctx.strokeStyle = "rgba(112,46,104," + (.5 + shrink * .35) + ")"; ctx.lineWidth = 1.5; ctx.stroke();
+        var vac = inside.map(function (p) { return [cx + (p[0] - cx) * .77, cy + (p[1] - cy) * .73]; });
+        polygon(ctx, vac, .5); ctx.fillStyle = "rgba(192,91,153,.2)"; ctx.fill();
+        ctx.strokeStyle = "rgba(248,180,215,.6)"; ctx.lineWidth = 1; ctx.stroke();
+        var nx = cx + cw * .31 * factor, ny = cy - ch * .11 * factor;
+        ctx.beginPath(); ctx.ellipse(nx, ny, cw * .034 + 1, ch * .09 + 1, -.2, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(102,51,110,.7)"; ctx.fill();
+        if (shrink > .16) {
+          ctx.strokeStyle = "#b565a14a"; ctx.lineWidth = .7;
+          for (var a = 0; a < 8; a += 2) { ctx.beginPath(); ctx.moveTo(pts[a][0], pts[a][1]); ctx.lineTo(inside[a][0], inside[a][1]); ctx.stroke(); }
+        }
+        // Water molecules move out (salt) or in (water / rinse) while a stage runs.
+        if (state.flow && !A.reduced) {
+          for (var k = 0; k < 4; k++) {
+            var phase = ((now / 1900) + hash(id + k * 7)) % 1, ang = hash(id + k * 19) * Math.PI * 2;
+            var rad = state.flow < 0 ? .13 + phase * .5 : .63 - phase * .49;
+            ctx.beginPath(); ctx.arc(cx + Math.cos(ang) * cw * rad, cy + Math.sin(ang) * ch * rad, 1.9, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(90,200,225," + (Math.sin(phase * Math.PI) * .9) + ")"; ctx.fill();
+          }
+        }
+        if (row === 0 && col === 0) selected = { wall: pts[2], nucleus: [nx, ny], vacuole: [cx - cw * .08 * factor, cy], gap: pts[5] };
+      }
+    }
+    ctx.restore();
+
+    if (state.labels && selected) {
+      var rot = function (p) { return [cxv + p[0] * Math.cos(-.27) - p[1] * Math.sin(-.27), cyv + p[0] * Math.sin(-.27) + p[1] * Math.cos(-.27)]; };
+      var items = [["Жасуша қабырғасы", rot(selected.wall), [cxv + R * 0.15, cyv - R * 0.72]], ["Вакуоль", rot(selected.vacuole), [cxv - R * 0.85, cyv + R * 0.35]], ["Ядро", rot(selected.nucleus), [cxv + R * 0.35, cyv + R * 0.55]]];
+      if (shrink > .2) items.push(["Протопласт ажырады", rot(selected.gap), [cxv - R * 0.55, cyv + R * 0.72]]);
+      ctx.font = Math.max(10, R * 0.065) + "px Segoe UI, Arial";
+      items.forEach(function (it) {
+        var pt = it[1], end = it[2], tw = ctx.measureText(it[0]).width;
+        ctx.beginPath(); ctx.moveTo(pt[0], pt[1]); ctx.lineTo(end[0] + 8, end[1] + 6); ctx.strokeStyle = "#ffffffcc"; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = "#ffffffe6"; ctx.fillRect(end[0] - 5, end[1] - 4, tw + 10, R * 0.09);
+        ctx.fillStyle = "#5e2f58"; ctx.fillText(it[0], end[0], end[1] + R * 0.06);
+        ctx.beginPath(); ctx.arc(pt[0], pt[1], 2.5, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill();
+      });
+    }
+    var shade = ctx.createRadialGradient(cxv, cyv, R * 0.5, cxv, cyv, R);
+    shade.addColorStop(0, "#33213a00"); shade.addColorStop(1, "#1d143b70");
+    ctx.beginPath(); ctx.arc(cxv, cyv, R, 0, Math.PI * 2); ctx.fillStyle = shade; ctx.fill();
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+
+  function animateShrink(to, duration) {
+    var from = state.shrink;
+    return A.tween(duration, function (t) { state.shrink = from + (to - from) * A.ease(t); });
+  }
+
+  JasushaBridge({
+    run: function (stage, params) {
+      if (stage === "salt") {
+        state.concentration = params.concentration || 4;
+        setChip(state.concentration + "% NaCl", "жасушадан сыртқа →");
+        state.flow = -1;
+        return animateShrink(saltShrink(state.concentration), 9000).then(function () { state.flow = 0; setChip(state.concentration + "% NaCl", "тепе-теңдік"); });
+      }
+      setChip(stage === "rinse" ? "таза су (шаю)" : "таза су", "→ жасуша ішіне");
+      state.flow = 1;
+      return animateShrink(0, stage === "rinse" ? 9000 : 6000).then(function () { state.flow = 0; setChip("таза су", "тепе-теңдік"); });
+    },
+    restore: function (completed, params) {
+      state.flow = 0;
+      var plasmolysed = completed.indexOf("salt") >= 0 && completed.indexOf("rinse") < 0;
+      state.shrink = plasmolysed ? saltShrink(params.concentration) : 0;
+      setChip(plasmolysed ? (params.concentration || 4) + "% NaCl" : "таза су", "тепе-теңдік");
+    },
+    options: function (o) { if ("labels" in o) state.labels = !!o.labels; },
+    capture: function () { return canvas.toDataURL("image/png"); },
+  });
+})();
+</script>
+</body>
+</html>

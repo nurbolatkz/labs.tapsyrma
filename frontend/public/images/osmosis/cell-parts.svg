@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 240" font-family="Segoe UI, Arial" font-size="13">
+  <rect width="560" height="240" fill="#fff"/>
+  <g transform="translate(30 40)">
+    <rect width="200" height="120" rx="14" fill="#fff0e4" stroke="#9d647d" stroke-width="5"/>
+    <rect x="8" y="8" width="184" height="104" rx="12" fill="#c95c97" fill-opacity=".35" stroke="#702e68" stroke-width="2"/>
+    <rect x="26" y="22" width="140" height="76" rx="26" fill="#c05b99" fill-opacity=".25" stroke="#f0a9cf" stroke-width="2"/>
+    <ellipse cx="160" cy="48" rx="12" ry="16" fill="#66336e"/>
+    <text x="100" y="-14" text-anchor="middle" font-weight="700" fill="#17342e">Таза судағы жасуша</text>
+  </g>
+  <g transform="translate(320 40)">
+    <rect width="200" height="120" rx="14" fill="#fff0e4" stroke="#9d647d" stroke-width="5"/>
+    <rect x="40" y="28" width="120" height="64" rx="30" fill="#a1397e" fill-opacity=".6" stroke="#702e68" stroke-width="2"/>
+    <rect x="56" y="38" width="88" height="44" rx="22" fill="#c05b99" fill-opacity=".3" stroke="#f0a9cf" stroke-width="2"/>
+    <ellipse cx="140" cy="52" rx="9" ry="12" fill="#66336e"/>
+    <path d="M6 8 40 30M194 8l-34 22M6 112l34-22M194 112l-34-22" stroke="#b565a1" stroke-width="1.2"/>
+    <text x="100" y="-14" text-anchor="middle" font-weight="700" fill="#17342e">Плазмолиз (тұз ерітіндісі)</text>
+  </g>
+  <g fill="#3a4a44">
+    <path d="M30 182h20" stroke="#9d647d" stroke-width="5"/><text x="58" y="187">Жасуша қабырғасы</text>
+    <rect x="200" y="176" width="20" height="12" rx="4" fill="#a1397e" fill-opacity=".55"/><text x="228" y="187">Протопласт (цитоплазма)</text>
+    <rect x="30" y="204" width="20" height="12" rx="6" fill="#c05b99" fill-opacity=".3" stroke="#f0a9cf"/><text x="58" y="215">Вакуоль</text>
+    <ellipse cx="210" cy="210" rx="6" ry="8" fill="#66336e"/><text x="228" y="215">Ядро</text>
+    <path d="M380 210h20" stroke="#b565a1"/><text x="408" y="215">Қабырға мен протопласт арасы</text>
+  </g>
+</svg>

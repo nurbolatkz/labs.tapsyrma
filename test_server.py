@@ -88,9 +88,63 @@ class ClassroomServerTest(unittest.TestCase):
         status, saved = self.request(f"/api/labs/{lab_id}/submissions", "POST", payload, self.student)
         self.assertEqual(status, 201)
         self.assertEqual(saved["score"], 3)
+        self.assertEqual(saved["checks"], {"q1": True, "q2": True, "q3": True})
         self.assertEqual(self.request(f"/api/labs/{lab_id}/submissions", "POST", payload, self.student)[0], 200)
         self.assertEqual(len(self.request(f"/api/teacher/labs/{lab_id}/results")[1]["results"]), 1)
         self.assertEqual(self.request("/data/classroom.sqlite3")[0], 404)
+
+    def test_generic_labs_score_and_report_checks(self):
+        self.login()
+        labs = {lab["kind"]: lab["id"] for lab in self.request("/api/teacher/labs")[1]["labs"]}
+        photo = {"name": "Dana", "className": "9 A", "conclusion": "Light makes the plant release more oxygen.",
+                 "answers": {"hypothesis": "up", "bubbles": {"d10": "45", "d20": 28, "d30": "16", "d40": 9},
+                             "p1": "oxygen", "p2": "down", "p3": "water", "p4": "co2"}}
+        status, saved = self.request(f"/api/labs/{labs['photosynthesis']}/submissions", "POST", photo, self.student)
+        self.assertEqual(status, 201)
+        self.assertEqual((saved["score"], saved["maxScore"]), (4, 5))
+        self.assertTrue(saved["checks"]["bubbles"])
+        self.assertFalse(saved["checks"]["p3"])
+        mitosis = {"name": "Arman", "className": "9 A", "conclusion": "Mitosis makes two identical daughter cells.",
+                   "answers": {"identify": {"a": "metaphase", "b": "prophase", "c": "anaphase", "d": "telophase"},
+                               "order": {"pos1": "prophase", "pos2": "metaphase", "pos3": "anaphase", "pos4": "telophase"},
+                               "m1": "meristem", "m2": "16", "m3": "separate"}}
+        status, saved = self.request(f"/api/labs/{labs['mitosis']}/submissions", "POST", mitosis, self.student)
+        self.assertEqual(status, 201)
+        self.assertEqual((saved["score"], saved["maxScore"]), (5, 6))
+        status, detail = self.request(f"/api/teacher/submissions/{saved['id']}")
+        self.assertEqual(detail["lab"]["kind"], "mitosis")
+        self.assertFalse(detail["result"]["payload"]["checks"]["identify"])
+        incomplete = {**mitosis, "answers": {**mitosis["answers"], "m2": "100"}}
+        self.assertEqual(self.request(f"/api/labs/{labs['mitosis']}/submissions", "POST", incomplete, self.student)[0], 400)
+
+    def test_demo_check_does_not_store(self):
+        self.login()
+        body = {"name": "Demo", "className": "Demo", "conclusion": "Light makes the plant release more oxygen.",
+                "answers": {"hypothesis": "up", "bubbles": {"d10": 46, "d20": 28, "d30": 15, "d40": 9},
+                            "p1": "oxygen", "p2": "down", "p3": "light", "p4": "co2"}}
+        status, checked = self.request("/api/demo/photosynthesis/check", "POST", body, self.student)
+        self.assertEqual(status, 200)
+        self.assertEqual(checked["score"], 5)
+        self.assertEqual(self.request("/api/demo/unknown/check", "POST", body, self.student)[0], 404)
+        self.assertTrue(all(lab["resultCount"] == 0 for lab in self.request("/api/teacher/labs")[1]["labs"]))
+
+    def test_static_files_and_client_routes(self):
+        dist = Path(self.temp.name) / "dist"
+        (dist / "assets").mkdir(parents=True)
+        (dist / "index.html").write_text("<div id=root></div>", encoding="utf-8")
+        (dist / "assets" / "app.js").write_text("console.log(1)", encoding="utf-8")
+        original, server.FRONTEND = server.FRONTEND, dist
+        try:
+            for path, kind in (("/", "text/html"), ("/teacher/labs/abc", "text/html"), ("/assets/app.js", "text/javascript")):
+                with urllib.request.urlopen(self.base + path) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertTrue(response.headers["Content-Type"].startswith(kind))
+            for path in ("/assets/missing.js", "/..%2f..%2fserver.py", "/%2e%2e/test.sqlite3"):
+                with self.assertRaises(urllib.error.HTTPError) as error:
+                    urllib.request.urlopen(self.base + path)
+                self.assertEqual(error.exception.code, 404)
+        finally:
+            server.FRONTEND = original
 
     def test_teacher_accounts_are_isolated(self):
         self.login()
@@ -99,7 +153,8 @@ class ClassroomServerTest(unittest.TestCase):
         status, _ = self.request("/api/teacher/register", "POST", {"name": "Teacher Two", "email": "second@example.com", "password": "another-password-123"}, second)
         self.assertEqual(status, 201)
         second_labs = self.request("/api/teacher/labs", client=second)[1]["labs"]
-        self.assertEqual(len(second_labs), 2)
+        self.assertEqual(len(second_labs), 4)
+        self.assertEqual({lab["kind"] for lab in second_labs}, set(server.LAB_KINDS))
         self.assertNotIn(first_lab["id"], {lab["id"] for lab in second_labs})
         self.assertEqual(self.request(f"/api/teacher/labs/{first_lab['id']}/results", client=second)[0], 404)
         self.assertEqual(self.request(f"/api/teacher/labs/{first_lab['id']}", "PATCH", {"title": "Changed", "className": "9 B", "deadline": None, "isOpen": False}, second)[0], 404)

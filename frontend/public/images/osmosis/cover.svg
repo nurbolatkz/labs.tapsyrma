@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200">
+  <rect width="320" height="200" fill="#f8ebf3"/>
+  <defs><radialGradient id="f" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#f6e7e6"/><stop offset="1" stop-color="#d7a6c4"/></radialGradient><clipPath id="c"><circle cx="160" cy="100" r="78"/></clipPath></defs>
+  <circle cx="160" cy="100" r="88" fill="#263a31"/>
+  <circle cx="160" cy="100" r="78" fill="url(#f)"/>
+  <g clip-path="url(#c)" transform="rotate(-14 160 100)">
+    <g fill="#fff0e4" fill-opacity=".7" stroke="#9d647d" stroke-width="2.5">
+      <rect x="70" y="40" width="80" height="50" rx="10"/><rect x="150" y="40" width="80" height="50" rx="10"/>
+      <rect x="40" y="90" width="80" height="50" rx="10"/><rect x="120" y="90" width="80" height="50" rx="10"/><rect x="200" y="90" width="80" height="50" rx="10"/>
+      <rect x="70" y="140" width="80" height="50" rx="10"/><rect x="150" y="140" width="80" height="50" rx="10"/>
+    </g>
+    <g fill="#a1397e" fill-opacity=".55" stroke="#702e68" stroke-width="1.2">
+      <rect x="80" y="49" width="60" height="32" rx="14"/><ellipse cx="190" cy="65" rx="20" ry="11"/>
+      <rect x="50" y="99" width="60" height="32" rx="14"/><ellipse cx="160" cy="115" rx="20" ry="11"/><rect x="210" y="99" width="60" height="32" rx="14"/>
+      <ellipse cx="110" cy="165" rx="20" ry="11"/><rect x="160" y="149" width="60" height="32" rx="14"/>
+    </g>
+  </g>
+  <text x="18" y="186" font-family="Segoe UI, Arial" font-size="12" font-weight="700" fill="#8a3d73">H₂O ⇄ NaCl</text>
+</svg>

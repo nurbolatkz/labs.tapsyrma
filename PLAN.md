@@ -78,7 +78,9 @@ The new labs are modelled on open teaching labs: PhET (CC BY 4.0), Amrita OLabs 
 6. Photosynthesis and mitosis labs, with server validation and tests.
 7. Server serves the build, old HTML removed, README updated, test in a real browser including the narration.
 
-## Open decisions
-1. Are these 4 labs right, or should topics come from the 9th-grade curriculum PDF?
-2. Audio: generate mp3 files with `edge-tts`, or use the browser voice only?
-3. Old HTML pages: delete them, or keep them alongside the React version for now?
+## Decisions
+1. Labs: the 4 planned labs.
+2. Audio: mp3 files generated with `edge-tts` (voice kk-KZ-AigulNeural), with the browser voice and captions as fallbacks.
+3. Old HTML pages: deleted (kept in git history).
+
+Status: implemented — see README.md.
