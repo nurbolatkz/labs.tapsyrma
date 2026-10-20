@@ -1,7 +1,7 @@
 """Shared classroom server for the two standalone biology labs.
 
 Run: python server.py
-Open http://127.0.0.1:8000/ and use the generated teacher password.
+Open http://127.0.0.1:8000/ and register a teacher account.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import hashlib
 import hmac
 import io
 import json
-import os
+import re
 import secrets
 import sqlite3
 import threading
@@ -81,15 +81,29 @@ def password_hash(password, salt):
     return hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), 250_000).hex()
 
 
+def seed_labs(conn, owner_id):
+    defaults = [
+        ("osmosis", "Өсімдік жасушасындағы осмос"),
+        ("enzyme", "Ферменттердің белсенділігі: температура және pH"),
+    ]
+    for kind, title in defaults:
+        conn.execute("INSERT INTO labs (id,kind,title,class_name,deadline,is_open,created_at,owner_id) VALUES (?,?,?,?,?,1,?,?)",
+                     (secrets.token_urlsafe(9), kind, title, "9 А", None, iso(now()), owner_id))
+
+
 def init_db():
     DATA.mkdir(exist_ok=True)
     with db() as conn:
         conn.executescript("""
         CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS teachers (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE,
+            salt TEXT NOT NULL, password_hash TEXT NOT NULL, created_at TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS labs (
             id TEXT PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL,
             class_name TEXT NOT NULL, deadline TEXT, is_open INTEGER NOT NULL DEFAULT 1,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL, owner_id TEXT REFERENCES teachers(id)
         );
         CREATE TABLE IF NOT EXISTS submissions (
             id TEXT PRIMARY KEY, lab_id TEXT NOT NULL REFERENCES labs(id),
@@ -99,24 +113,23 @@ def init_db():
             UNIQUE(lab_id, id)
         );
         CREATE TABLE IF NOT EXISTS sessions (
-            token_hash TEXT PRIMARY KEY, expires_at TEXT NOT NULL
+            token_hash TEXT PRIMARY KEY, expires_at TEXT NOT NULL,
+            teacher_id TEXT REFERENCES teachers(id)
         );
         CREATE INDEX IF NOT EXISTS submissions_lab_idx ON submissions(lab_id,submitted_at);
         """)
-        if not conn.execute("SELECT 1 FROM settings WHERE key='teacher_salt'").fetchone():
-            password = os.environ.get("TEACHER_PASSWORD") or secrets.token_urlsafe(12)
-            salt = secrets.token_hex(16)
-            conn.execute("INSERT INTO settings VALUES ('teacher_salt',?)", (salt,))
-            conn.execute("INSERT INTO settings VALUES ('teacher_hash',?)", (password_hash(password, salt),))
-            if not os.environ.get("TEACHER_PASSWORD"):
-                PASSWORD_FILE.write_text(password + "\n", encoding="utf-8")
-                print(f"Teacher password saved in: {PASSWORD_FILE}", flush=True)
-        defaults = [
-            ("osmos-class-demo", "osmosis", "Өсімдік жасушасындағы осмос", "9 А"),
-            ("enzyme-b-worksheet", "enzyme", "Ферменттердің белсенділігі: температура және pH", "9 А"),
-        ]
-        for lab_id, kind, title, class_name in defaults:
-            conn.execute("INSERT OR IGNORE INTO labs VALUES (?,?,?,?,?,1,?)", (lab_id, kind, title, class_name, None, iso(now())))
+        if "owner_id" not in {row["name"] for row in conn.execute("PRAGMA table_info(labs)")}:
+            conn.execute("ALTER TABLE labs ADD COLUMN owner_id TEXT REFERENCES teachers(id)")
+        if "teacher_id" not in {row["name"] for row in conn.execute("PRAGMA table_info(sessions)")}:
+            conn.execute("ALTER TABLE sessions ADD COLUMN teacher_id TEXT REFERENCES teachers(id)")
+        old_salt = conn.execute("SELECT value FROM settings WHERE key='teacher_salt'").fetchone()
+        old_hash = conn.execute("SELECT value FROM settings WHERE key='teacher_hash'").fetchone()
+        if old_salt and old_hash:
+            legacy_id = "legacy-teacher"
+            conn.execute("INSERT OR IGNORE INTO teachers VALUES (?,?,?,?,?,?)",
+                         (legacy_id, "Мұғалім", "teacher@local", old_salt["value"], old_hash["value"], iso(now())))
+            conn.execute("UPDATE labs SET owner_id=? WHERE owner_id IS NULL", (legacy_id,))
+            conn.execute("UPDATE sessions SET teacher_id=? WHERE teacher_id IS NULL", (legacy_id,))
 
 
 def lab_json(row):
@@ -234,17 +247,27 @@ class Handler(BaseHTTPRequestHandler):
             cookie.load(self.headers.get("Cookie", ""))
             token = cookie["teacher_session"].value
         except (KeyError, ValueError):
-            return False
+            return None
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         with db() as conn:
-            row = conn.execute("SELECT expires_at FROM sessions WHERE token_hash=?", (token_hash,)).fetchone()
-        return bool(row and parse_date(row["expires_at"]) > now())
+            row = conn.execute("SELECT sessions.expires_at,teachers.id,teachers.name,teachers.email FROM sessions JOIN teachers ON teachers.id=sessions.teacher_id WHERE token_hash=?", (token_hash,)).fetchone()
+        return dict(row) if row and parse_date(row["expires_at"]) > now() else None
 
     def teacher_required(self):
-        if self.teacher():
+        self.current_teacher = self.teacher()
+        if self.current_teacher:
             return True
         self.fail(HTTPStatus.UNAUTHORIZED, "Мұғалім ретінде кіріңіз.")
         return False
+
+    def start_session(self, teacher, status=200):
+        token = secrets.token_urlsafe(32)
+        with db() as conn:
+            conn.execute("INSERT INTO sessions (token_hash,expires_at,teacher_id) VALUES (?,?,?)",
+                         (hashlib.sha256(token.encode()).hexdigest(), iso(now() + timedelta(days=7)), teacher["id"]))
+        secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
+        return self.send_json(status, {"authenticated": True, "teacher": {"id": teacher["id"], "name": teacher["name"], "email": teacher["email"]}},
+                              f"teacher_session={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800{secure}")
 
     def same_origin(self):
         origin = self.headers.get("Origin")
@@ -272,7 +295,9 @@ class Handler(BaseHTTPRequestHandler):
                 rows = conn.execute("SELECT * FROM labs ORDER BY created_at").fetchall()
             return self.send_json(200, {"labs": [lab_json(row) for row in rows], "serverTime": iso(now())})
         if path == "/api/teacher/me":
-            return self.send_json(200 if self.teacher() else 401, {"authenticated": self.teacher()})
+            teacher = self.teacher()
+            return self.send_json(200 if teacher else 401, {"authenticated": bool(teacher),
+                "teacher": {"id": teacher["id"], "name": teacher["name"], "email": teacher["email"]} if teacher else None})
         if path.startswith("/api/labs/") and path.count("/") == 3:
             lab_id = path.split("/")[3]
             with db() as conn:
@@ -281,15 +306,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/teacher/labs":
             if not self.teacher_required(): return
             with db() as conn:
-                rows = conn.execute("SELECT labs.*,COUNT(submissions.id) AS result_count FROM labs LEFT JOIN submissions ON labs.id=submissions.lab_id GROUP BY labs.id ORDER BY labs.created_at").fetchall()
+                rows = conn.execute("SELECT labs.*,COUNT(submissions.id) AS result_count FROM labs LEFT JOIN submissions ON labs.id=submissions.lab_id WHERE labs.owner_id=? GROUP BY labs.id ORDER BY labs.created_at", (self.current_teacher["id"],)).fetchall()
             return self.send_json(200, {"labs": [{**lab_json(row), "resultCount": row["result_count"]} for row in rows]})
         parts = path.split("/")
         if len(parts) == 6 and parts[:4] == ["", "api", "teacher", "labs"] and parts[5] in ("results", "results.csv"):
             if not self.teacher_required(): return
             lab_id = parts[4]
             with db() as conn:
-                lab = conn.execute("SELECT * FROM labs WHERE id=?", (lab_id,)).fetchone()
-                rows = conn.execute("SELECT * FROM submissions WHERE lab_id=? ORDER BY submitted_at DESC", (lab_id,)).fetchall()
+                lab = conn.execute("SELECT * FROM labs WHERE id=? AND owner_id=?", (lab_id, self.current_teacher["id"])).fetchone()
+                rows = conn.execute("SELECT * FROM submissions WHERE lab_id=? ORDER BY submitted_at DESC", (lab_id,)).fetchall() if lab else []
             if not lab: return self.fail(404, "Зертхана табылмады.")
             if parts[5] == "results.csv":
                 output = io.StringIO()
@@ -314,7 +339,7 @@ class Handler(BaseHTTPRequestHandler):
         if len(parts) == 5 and parts[:4] == ["", "api", "teacher", "submissions"]:
             if not self.teacher_required(): return
             with db() as conn:
-                row = conn.execute("SELECT * FROM submissions WHERE id=?", (parts[4],)).fetchone()
+                row = conn.execute("SELECT submissions.* FROM submissions JOIN labs ON labs.id=submissions.lab_id WHERE submissions.id=? AND labs.owner_id=?", (parts[4], self.current_teacher["id"])).fetchone()
             return self.send_json(200, {"result": {"id": row["id"], "labId": row["lab_id"], "name": row["student_name"],
                 "className": row["class_name"], "score": row["score"], "maxScore": row["max_score"],
                 "submittedAt": row["submitted_at"], "payload": json.loads(row["payload"])}}) if row else self.fail(404, "Есеп табылмады.")
@@ -331,18 +356,31 @@ class Handler(BaseHTTPRequestHandler):
         path = unquote(urlparse(self.path).path)
         try:
             data = self.json_body()
+            if path == "/api/teacher/register" and method == "POST":
+                if not isinstance(data, dict): raise ValueError("Тіркелу деректері дұрыс емес.")
+                name = clean_text(data.get("name"), "Аты-жөні", 2, 80)
+                email = clean_text(data.get("email"), "Email", 5, 254).lower()
+                if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email): raise ValueError("Email дұрыс емес.")
+                password = data.get("password")
+                if not isinstance(password, str) or len(password) < 10 or len(password) > 200:
+                    raise ValueError("Құпиясөз 10–200 таңба болуы керек.")
+                teacher_id = secrets.token_urlsafe(12)
+                salt = secrets.token_hex(16)
+                with db() as conn:
+                    if conn.execute("SELECT 1 FROM teachers WHERE email=?", (email,)).fetchone():
+                        return self.fail(409, "Бұл email бұрын тіркелген.")
+                    conn.execute("INSERT INTO teachers VALUES (?,?,?,?,?,?)", (teacher_id, name, email, salt, password_hash(password, salt), iso(now())))
+                    seed_labs(conn, teacher_id)
+                    teacher = conn.execute("SELECT id,name,email FROM teachers WHERE id=?", (teacher_id,)).fetchone()
+                return self.start_session(teacher, 201)
             if path == "/api/teacher/login" and method == "POST":
+                email = data.get("email") if isinstance(data, dict) else None
                 password = data.get("password") if isinstance(data, dict) else None
                 with db() as conn:
-                    salt = conn.execute("SELECT value FROM settings WHERE key='teacher_salt'").fetchone()[0]
-                    expected = conn.execute("SELECT value FROM settings WHERE key='teacher_hash'").fetchone()[0]
-                if not isinstance(password, str) or not hmac.compare_digest(password_hash(password, salt), expected):
-                    return self.fail(401, "Құпиясөз қате.")
-                token = secrets.token_urlsafe(32)
-                with db() as conn:
-                    conn.execute("INSERT INTO sessions VALUES (?,?)", (hashlib.sha256(token.encode()).hexdigest(), iso(now() + timedelta(days=7))))
-                secure = "; Secure" if self.headers.get("X-Forwarded-Proto") == "https" else ""
-                return self.send_json(200, {"authenticated": True}, f"teacher_session={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800{secure}")
+                    teacher = conn.execute("SELECT * FROM teachers WHERE email=?", (email.strip().lower(),)).fetchone() if isinstance(email, str) else None
+                if not teacher or not isinstance(password, str) or not hmac.compare_digest(password_hash(password, teacher["salt"]), teacher["password_hash"]):
+                    return self.fail(401, "Email немесе құпиясөз қате.")
+                return self.start_session(teacher)
             if path == "/api/teacher/logout" and method == "POST":
                 cookie = SimpleCookie(); cookie.load(self.headers.get("Cookie", ""))
                 if "teacher_session" in cookie:
@@ -359,7 +397,8 @@ class Handler(BaseHTTPRequestHandler):
                     deadline = iso(parse_date(data.get("deadline")))
                     lab_id = secrets.token_urlsafe(9).replace("-", "").replace("_", "")
                     with db() as conn:
-                        conn.execute("INSERT INTO labs VALUES (?,?,?,?,?,1,?)", (lab_id, kind, title, class_name, deadline, iso(now())))
+                        conn.execute("INSERT INTO labs (id,kind,title,class_name,deadline,is_open,created_at,owner_id) VALUES (?,?,?,?,?,1,?,?)",
+                                     (lab_id, kind, title, class_name, deadline, iso(now()), self.current_teacher["id"]))
                         row = conn.execute("SELECT * FROM labs WHERE id=?", (lab_id,)).fetchone()
                     return self.send_json(201, {"lab": lab_json(row)})
                 parts = path.split("/")
@@ -370,9 +409,9 @@ class Handler(BaseHTTPRequestHandler):
                     is_open = data.get("isOpen")
                     if not isinstance(is_open, bool): raise ValueError("Ашық/жабық күйі дұрыс емес.")
                     with db() as conn:
-                        result = conn.execute("UPDATE labs SET title=?,class_name=?,deadline=?,is_open=? WHERE id=?",
-                                              (title, class_name, deadline, int(is_open), parts[4]))
-                        row = conn.execute("SELECT * FROM labs WHERE id=?", (parts[4],)).fetchone()
+                        result = conn.execute("UPDATE labs SET title=?,class_name=?,deadline=?,is_open=? WHERE id=? AND owner_id=?",
+                                              (title, class_name, deadline, int(is_open), parts[4], self.current_teacher["id"]))
+                        row = conn.execute("SELECT * FROM labs WHERE id=? AND owner_id=?", (parts[4], self.current_teacher["id"])).fetchone()
                     return self.send_json(200, {"lab": lab_json(row)}) if result.rowcount else self.fail(404, "Зертхана табылмады.")
             parts = path.split("/")
             if len(parts) == 5 and parts[:3] == ["", "api", "labs"] and parts[4] == "submissions" and method == "POST":
@@ -401,7 +440,7 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self.fail(400, str(exc))
         except sqlite3.IntegrityError:
-            self.fail(409, "Бұл есеп бұрын тапсырылған.")
+            self.fail(409, "Бұл дерек бұрын тіркелген.")
 
 
 def main():
