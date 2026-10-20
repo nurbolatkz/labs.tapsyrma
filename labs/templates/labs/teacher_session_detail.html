@@ -1,0 +1,62 @@
+{% extends "labs/base.html" %}
+
+{% block title %}Сабақ {{ session.code }}{% endblock %}
+
+{% block content %}
+<nav class="crumbs"><a href="{% url 'labs:teacher_sessions' %}">← Сабақтар</a></nav>
+
+<article class="card">
+  <h1>{{ session.lab.title }}</h1>
+  <p class="muted">{{ session.title|default:"—" }} · құрылды: {{ session.created_at|date:"Y-m-d H:i" }}</p>
+
+  <div class="share-box">
+    <div>
+      <p class="eyebrow">Сабақ коды</p>
+      <p class="code-big mono">{{ session.code }}</p>
+    </div>
+    <div class="share-url">
+      <label class="small muted" for="shareurl">Сілтеме (оқушыларға жіберіңіз)</label>
+      <input id="shareurl" type="text" readonly value="{{ share_url }}"
+             onclick="this.select();document.execCommand('copy');">
+      <p class="small muted">Шерту — көшіру.</p>
+    </div>
+  </div>
+
+  <div class="actions" style="margin-top: 16px;">
+    <form method="post" action="{% url 'labs:teacher_session_toggle' code=session.code %}" class="inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-ghost btn-sm">
+        {% if session.is_active %}Жабу{% else %}Қайта ашу{% endif %}
+      </button>
+    </form>
+    <form method="post" action="{% url 'labs:teacher_session_delete' code=session.code %}" class="inline"
+          onsubmit="return confirm('Сабақ пен барлық жауаптары өшіріледі. Жалғастыру?');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger btn-sm">Өшіру</button>
+    </form>
+  </div>
+
+  <h2 class="section-title">Жауаптар ({{ submissions.count }})</h2>
+  {% if submissions %}
+  <table class="tbl">
+    <thead><tr><th>Күні</th><th>Оқушы</th><th>Сыныбы</th><th>Мектебі</th><th>Балл</th><th>%</th><th>Өтті</th><th></th></tr></thead>
+    <tbody>
+    {% for s in submissions %}
+      <tr>
+        <td class="small mono">{{ s.submitted_at|date:"Y-m-d H:i" }}</td>
+        <td>{{ s.student_name }}</td>
+        <td>{{ s.student_class }}</td>
+        <td>{{ s.student_school }}</td>
+        <td class="mono">{{ s.score }}/{{ s.max_score }}</td>
+        <td class="mono">{{ s.percent }}%</td>
+        <td>{% if s.passed %}<span class="pill ok">иә</span>{% else %}<span class="pill fail">жоқ</span>{% endif %}</td>
+        <td class="small"><a href="{% url 'labs:teacher_submission_detail' submission_id=s.id %}">ашу →</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty small">Әзірге жауаптар жоқ.</div>
+  {% endif %}
+</article>
+{% endblock %}

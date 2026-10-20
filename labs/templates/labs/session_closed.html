@@ -1,0 +1,13 @@
+{% extends "labs/base.html" %}
+
+{% block title %}Жабық сабақ{% endblock %}
+
+{% block content %}
+<article class="card narrow">
+  <h1>Сабақ жабық</h1>
+  <p class="muted">
+    Бұл сабақ сессиясы қазір қолжетімсіз. Мұғаліміңізден жаңа код сұраңыз.
+  </p>
+  <a class="btn btn-ghost" href="{% url 'labs:home' %}">← Басты бетке</a>
+</article>
+{% endblock %}

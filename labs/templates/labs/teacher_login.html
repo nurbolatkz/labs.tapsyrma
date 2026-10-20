@@ -1,0 +1,26 @@
+{% extends "labs/base.html" %}
+
+{% block title %}Мұғалімге кіру{% endblock %}
+
+{% block content %}
+<article class="card narrow">
+  <h1>Мұғалімге кіру</h1>
+  <p class="muted small">Email және құпиясөзіңізді енгізіңіз.</p>
+
+  <form method="post" class="form">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="field">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<p class="err">{{ field.errors|join:", " }}</p>{% endif %}
+      </div>
+    {% endfor %}
+    <button type="submit" class="btn">Кіру</button>
+  </form>
+
+  <p class="small muted" style="margin-top: 16px;">
+    Әлі тіркелмедіңіз бе? <a href="{% url 'labs:teacher_register' %}">Тіркеліңіз</a>.
+  </p>
+</article>
+{% endblock %}

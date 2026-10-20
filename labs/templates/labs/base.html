@@ -1,0 +1,48 @@
+{% load static %}<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{% block title %}Биология · Онлайн зертханалар{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'labs/style.css' %}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<header class="site-header">
+  <div class="container header-row">
+    <a class="brand" href="{% url 'labs:home' %}">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Биология · Онлайн зертханалар</span>
+    </a>
+    <nav class="site-nav">
+      {% if user.is_authenticated %}
+        <a href="{% url 'labs:teacher_dashboard' %}">Басқару</a>
+        <a href="{% url 'labs:teacher_sessions' %}">Сабақтар</a>
+        <a href="{% url 'labs:teacher_reports' %}">Есептер</a>
+        <a href="{% url 'labs:teacher_logout' %}" class="muted">Шығу</a>
+      {% else %}
+        <a href="{% url 'labs:teacher_login' %}" class="muted">Кіру</a>
+        <a href="{% url 'labs:teacher_register' %}" class="btn btn-sm">Мұғалімге тіркелу</a>
+      {% endif %}
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+  {% if messages %}
+    <ul class="messages">
+      {% for m in messages %}
+        <li class="msg msg-{{ m.tags|default:'info' }}">{{ m }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <span class="muted small">© Биология онлайн зертханалары · dev-way.birqadam.kz</span>
+  </div>
+</footer>
+</body>
+</html>

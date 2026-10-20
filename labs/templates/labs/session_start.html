@@ -1,0 +1,24 @@
+{% extends "labs/base.html" %}
+
+{% block title %}{{ session.lab.title }} — бастау{% endblock %}
+
+{% block content %}
+<article class="card narrow">
+  <p class="eyebrow mono">Сабақ коды: {{ session.code }}</p>
+  <h1>{{ session.lab.title }}</h1>
+  {% if session.title %}<p class="muted">{{ session.title }}</p>{% endif %}
+  {% if session.lab.description %}<p class="lede">{{ session.lab.description }}</p>{% endif %}
+
+  <form method="post" class="form">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="field">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<p class="err">{{ field.errors|join:", " }}</p>{% endif %}
+      </div>
+    {% endfor %}
+    <button type="submit" class="btn">Жұмысты бастау</button>
+  </form>
+</article>
+{% endblock %}

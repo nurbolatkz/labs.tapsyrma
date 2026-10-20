@@ -1,0 +1,62 @@
+{% extends "labs/base.html" %}
+
+{% block title %}{{ lab.title }}{% endblock %}
+
+{% block content %}
+<nav class="crumbs"><span class="muted">Сабақ: <span class="mono">{{ session.code }}</span></span></nav>
+
+<article class="card lab-work">
+  <header class="lab-work-head">
+    <h1>{{ lab.title }}</h1>
+    <p class="muted small">Оқушы: {{ student.student_name }} · {{ student.student_class }} · {{ student.student_school }}</p>
+  </header>
+
+  <section class="animation">
+    <div class="section-head">
+      <h2 class="section-title">Анимация</h2>
+    </div>
+    {% if lab.animation_html %}
+      <iframe class="animation-frame"
+              sandbox="allow-scripts allow-pointer-lock allow-same-origin"
+              srcdoc="{{ lab.animation_html }}"
+              title="Зертхана анимациясы"
+              loading="lazy"></iframe>
+    {% else %}
+      <div class="empty">Анимация әлі қосылмаған.</div>
+    {% endif %}
+  </section>
+
+  <section class="worksheet">
+    <h2 class="section-title">Жұмыс парағы</h2>
+    {% if questions %}
+    <form method="post" class="form" id="worksheet">
+      {% csrf_token %}
+      <ol class="qs">
+        {% for q in questions %}
+          <li class="q">
+            <p class="q-prompt">{{ q.prompt }}</p>
+            {% if q.kind == 'mcq' %}
+              <ul class="opts">
+                {% for opt in q.options %}
+                  <li>
+                    <label>
+                      <input type="radio" name="q{{ q.id }}" value="{{ forloop.counter0 }}" required>
+                      <span>{{ opt }}</span>
+                    </label>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <textarea name="q{{ q.id }}" rows="3" required></textarea>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+      <button type="submit" class="btn">Жауаптарды жіберу</button>
+    </form>
+    {% else %}
+      <div class="empty">Бұл зертханада сұрақтар жоқ.</div>
+    {% endif %}
+  </section>
+</article>
+{% endblock %}

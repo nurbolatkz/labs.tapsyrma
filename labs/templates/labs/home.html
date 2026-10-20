@@ -1,0 +1,111 @@
+{% extends "labs/base.html" %}
+
+{% block body_class %}landing{% endblock %}
+
+{% block content %}
+<section class="hero-lg">
+  <div class="hero-text">
+    <span class="hero-eyebrow">Биология · 9–11 сынып</span>
+    <h1>Интерактивті зертханалар —<br>мұғалімнің бір сілтемесімен.</h1>
+    <p class="lede">
+      Анимация, қазақша дыбыстық түсіндірме, жұмыс парағы.
+      Мұғалім сабақ жасайды, оқушылар кодпен кіреді,
+      нәтиже бірден есепке түседі.
+    </p>
+
+    <form method="post" action="{% url 'labs:session_enter' %}" class="code-form" novalidate>
+      {% csrf_token %}
+      <label for="code">Сабақ коды</label>
+      <div class="code-row">
+        <input type="text" id="code" name="code" placeholder="мысалы: a7k3m2p9"
+               autocapitalize="off" autocorrect="off" autocomplete="off"
+               value="{{ code_form.code.value|default:'' }}" required>
+        <button type="submit" class="btn">Сабаққа кіру →</button>
+      </div>
+      {% if code_form.code.errors %}<p class="err">{{ code_form.code.errors|join:", " }}</p>{% endif %}
+      <p class="small muted">Код мұғалімнен беріледі. Ешқандай тіркелу қажет емес.</p>
+    </form>
+  </div>
+
+  <aside class="hero-art" aria-hidden="true">
+    <svg viewBox="0 0 360 280" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="cellGrad" cx="50%" cy="50%" r="60%">
+          <stop offset="0%" stop-color="#dcfce7"/>
+          <stop offset="100%" stop-color="#86efac"/>
+        </radialGradient>
+      </defs>
+      <rect x="20" y="30" width="320" height="220" rx="34" fill="url(#cellGrad)" stroke="#166534" stroke-width="2"/>
+      <ellipse cx="140" cy="140" rx="52" ry="40" fill="#a78bfa" opacity="0.9"/>
+      <circle cx="145" cy="135" r="12" fill="#5b21b6" opacity="0.5"/>
+      <ellipse cx="265" cy="90" rx="38" ry="20" fill="#fb923c" opacity="0.9"/>
+      <ellipse cx="275" cy="195" rx="44" ry="24" fill="#4ade80"/>
+      <circle cx="260" cy="195" r="4" fill="#166534"/>
+      <circle cx="275" cy="191" r="4" fill="#166534"/>
+      <circle cx="290" cy="197" r="4" fill="#166534"/>
+      <circle cx="85" cy="220" r="5" fill="#1d4ed8"/>
+      <circle cx="100" cy="230" r="5" fill="#1d4ed8"/>
+      <circle cx="75" cy="235" r="5" fill="#1d4ed8"/>
+    </svg>
+  </aside>
+</section>
+
+<section class="features">
+  <article>
+    <div class="feat-ico">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>
+    </div>
+    <h3>Нағыз тәжірибе</h3>
+    <p>Оқушы анимациямен жұмыс істеп, құбылысты өз көзімен көреді. Сосын жұмыс парағының сұрақтарына жауап береді.</p>
+  </article>
+  <article>
+    <div class="feat-ico">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 14c0-4 3-7 7-7h2c4 0 7 3 7 7v2a4 4 0 01-4 4H8a4 4 0 01-4-4v-2z"/><path d="M9 11v4m6-4v4"/></svg>
+    </div>
+    <h3>Қазақша дыбыс</h3>
+    <p>Зертхананың ішінде қазақ тілінде дыбыстық түсіндірме. Оқушы оқып қана қоймай, тыңдап та үйренеді.</p>
+  </article>
+  <article>
+    <div class="feat-ico">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h10M7 17h6"/></svg>
+    </div>
+    <h3>Автоесеп</h3>
+    <p>Тест сұрақтары автоматты бағаланады. Ашық жауаптар мұғалімге түседі. Әр оқушы бойынша толық есеп.</p>
+  </article>
+</section>
+
+<section class="how">
+  <h2>Қалай жұмыс істейді</h2>
+  <ol class="how-steps">
+    <li>
+      <span class="step-num">1</span>
+      <h4>Мұғалім зертхана дайындайды</h4>
+      <p>HTML-файл жүктейді немесе дайын үлгіні таңдайды. Сұрақтарды қосады.</p>
+    </li>
+    <li>
+      <span class="step-num">2</span>
+      <h4>Сабақ сессиясын ашады</h4>
+      <p>Жүйе қысқа код береді (мыс. <span class="mono">a7k3m2p9</span>). Оны оқушыларға жібереді.</p>
+    </li>
+    <li>
+      <span class="step-num">3</span>
+      <h4>Оқушылар жұмыс істейді</h4>
+      <p>Кодты енгізіп, аты-жөнін жазып, зертханада тәжірибе жасап, жауап береді.</p>
+    </li>
+    <li>
+      <span class="step-num">4</span>
+      <h4>Мұғалім нәтижені көреді</h4>
+      <p>Әр оқушының баллы, жауаптары, өту-өтпегені — панельде.</p>
+    </li>
+  </ol>
+</section>
+
+<section class="cta">
+  <div class="cta-card">
+    <h3>Мұғалімсіз бе?</h3>
+    <p class="muted">Тіркеліп, өз сыныбыңызға зертхана ашыңыз. Тегін.</p>
+    <a class="btn" href="{% url 'labs:teacher_register' %}">Тіркелу</a>
+    <a class="btn btn-ghost" href="{% url 'labs:teacher_login' %}">Кіру</a>
+  </div>
+</section>
+{% endblock %}

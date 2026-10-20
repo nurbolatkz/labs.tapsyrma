@@ -1,0 +1,91 @@
+{% extends "labs/base.html" %}
+
+{% block title %}{% if is_new %}Жаңа зертхана{% else %}{{ lab.title }} — өңдеу{% endif %}{% endblock %}
+
+{% block content %}
+<nav class="crumbs"><a href="{% url 'labs:teacher_dashboard' %}">← Басқару</a></nav>
+
+<article class="card">
+  <h1>{% if is_new %}Жаңа зертхана{% else %}Зертхана: {{ lab.title }}{% endif %}</h1>
+
+  <form method="post" class="form" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="field">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<p class="help small">{{ field.help_text }}</p>{% endif %}
+        {% if field.errors %}<p class="err">{{ field.errors|join:", " }}</p>{% endif %}
+      </div>
+    {% endfor %}
+    <div class="field">
+      <label for="html_file">HTML файл жүктеу (міндетті емес)</label>
+      <input type="file" name="html_file" id="html_file" accept=".html,.htm,text/html">
+      <p class="help small">Файл жүктелсе, оның мазмұны «Анимация HTML» өрісінің орнына сақталады.</p>
+    </div>
+    <div class="actions">
+      <button type="submit" name="action" value="save" class="btn">Сақтау</button>
+    </div>
+  </form>
+
+  {% if not is_new %}
+  <hr>
+  <section>
+    <h2 class="section-title">Сұрақтар</h2>
+    {% if questions %}
+    <ol class="qs qs-admin">
+      {% for q in questions %}
+        <li>
+          <div class="q-row">
+            <div>
+              <p class="q-prompt"><strong>№{{ q.order }}.</strong> {{ q.prompt }}</p>
+              <p class="small muted">
+                {{ q.get_kind_display }} · {{ q.points }} балл
+                {% if q.kind == 'mcq' %}
+                  · нұсқалар: {{ q.options|join:" / " }}
+                  · дұрысы: №{{ q.correct_option|add:1 }}
+                {% endif %}
+              </p>
+            </div>
+            <form method="post" class="inline">
+              {% csrf_token %}
+              <button type="submit" name="action" value="delete_question:{{ q.id }}"
+                      class="btn btn-ghost btn-sm"
+                      onclick="return confirm('Сұрақ өшірілсін бе?');">Өшіру</button>
+            </form>
+          </div>
+        </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="empty small">Сұрақ әлі жоқ.</div>
+    {% endif %}
+
+    <h3 class="section-title">Жаңа сұрақ қосу</h3>
+    <form method="post" class="form grid-form">
+      {% csrf_token %}
+      {% for field in qform %}
+        <div class="field">
+          <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<p class="help small">{{ field.help_text }}</p>{% endif %}
+          {% if field.errors %}<p class="err">{{ field.errors|join:", " }}</p>{% endif %}
+        </div>
+      {% endfor %}
+      <div class="actions">
+        <button type="submit" name="action" value="add_question" class="btn">Сұрақ қосу</button>
+      </div>
+    </form>
+  </section>
+
+  <hr>
+  <section>
+    <form method="post" action="{% url 'labs:teacher_lab_delete' lab_id=lab.id %}"
+          onsubmit="return confirm('Зертхана және барлық жауаптары өшіріледі. Жалғастыру?');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger btn-sm">Зертхананы өшіру</button>
+    </form>
+  </section>
+  {% endif %}
+</article>
+{% endblock %}

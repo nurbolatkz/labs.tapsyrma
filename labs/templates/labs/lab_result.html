@@ -1,0 +1,53 @@
+{% extends "labs/base.html" %}
+
+{% block title %}Нәтиже — {{ lab.title }}{% endblock %}
+
+{% block content %}
+<nav class="crumbs"><a href="{% url 'labs:home' %}">← Басты бет</a></nav>
+
+<article class="card result">
+  <header>
+    <h1>Нәтиже</h1>
+    <p class="muted">{{ lab.title }} · {{ submission.submitted_at|date:"Y-m-d H:i" }}</p>
+  </header>
+
+  <div class="score-row">
+    <div class="score">
+      <span class="score-num">{{ submission.score }}/{{ submission.max_score }}</span>
+      <span class="score-pct">{{ submission.percent }}%</span>
+    </div>
+    <div class="verdict {% if submission.passed %}ok{% else %}fail{% endif %}">
+      {% if submission.passed %}Өттіңіз{% else %}Өтпедіңіз{% endif %}
+    </div>
+  </div>
+
+  <p class="muted small">
+    Оқушы: {{ submission.student_name }} · {{ submission.student_class }} · {{ submission.student_school }}
+  </p>
+
+  <section>
+    <h2 class="section-title">Жауаптар</h2>
+    <ol class="qs qs-review">
+      {% for a in answers %}
+        <li>
+          <p class="q-prompt">{{ a.question.prompt }}</p>
+          {% if a.question.kind == 'mcq' %}
+            <p class="ans {% if a.is_correct %}ok{% else %}fail{% endif %}">
+              Сіздің жауабыңыз: {{ a.chosen_text }}
+              {% if a.is_correct %}· ✓{% else %}· ✗{% endif %}
+            </p>
+            {% if not a.is_correct %}
+              <p class="ans muted small">Дұрыс жауап: {{ a.correct_text }}</p>
+            {% endif %}
+          {% else %}
+            <p class="ans">Сіздің жауабыңыз: <em>{{ a.text_answer|default:"—" }}</em></p>
+            <p class="muted small">Бұл жауап мұғалімнің тексеруіне жіберілді.</p>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <p><a class="btn btn-ghost" href="{% url 'labs:home' %}">Басты бетке</a></p>
+</article>
+{% endblock %}

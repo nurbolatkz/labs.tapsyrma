@@ -1,0 +1,27 @@
+{% extends "labs/base.html" %}
+
+{% block title %}Мұғалімге тіркелу{% endblock %}
+
+{% block content %}
+<article class="card narrow">
+  <h1>Мұғалімге тіркелу</h1>
+  <p class="muted small">Тіркеліп, өз сыныбыңызға зертханалар ашыңыз.</p>
+
+  <form method="post" class="form">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="field">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<p class="err">{{ field.errors|join:", " }}</p>{% endif %}
+      </div>
+    {% endfor %}
+    {% if form.non_field_errors %}<p class="err">{{ form.non_field_errors|join:" " }}</p>{% endif %}
+    <button type="submit" class="btn">Тіркелу</button>
+  </form>
+
+  <p class="small muted" style="margin-top: 16px;">
+    Есепшотыңыз бар ма? <a href="{% url 'labs:teacher_login' %}">Кіріңіз</a>.
+  </p>
+</article>
+{% endblock %}

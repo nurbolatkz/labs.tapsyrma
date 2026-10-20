@@ -1,0 +1,68 @@
+{% extends "labs/base.html" %}
+
+{% block title %}Басқару панелі{% endblock %}
+
+{% block content %}
+<section class="dash-head">
+  <div>
+    <h1>Басқару</h1>
+    <p class="muted small">
+      {% if user.first_name %}{{ user.first_name }}{% else %}{{ user.email }}{% endif %}
+    </p>
+  </div>
+  <div class="dash-actions">
+    <a class="btn btn-ghost" href="{% url 'labs:teacher_lab_new' %}">+ Жаңа зертхана</a>
+    <a class="btn" href="{% url 'labs:teacher_session_new' %}">+ Жаңа сабақ</a>
+  </div>
+</section>
+
+<section>
+  <h2 class="section-title">Менің зертханаларым</h2>
+  {% if labs %}
+  <table class="tbl">
+    <thead>
+      <tr><th>Атауы</th><th>Сұрақтар</th><th>Жарияланған</th><th>Жауаптар</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for lab in labs %}
+      <tr>
+        <td><a href="{% url 'labs:teacher_lab_edit' lab_id=lab.id %}">{{ lab.title }}</a></td>
+        <td>{{ lab.questions.count }}</td>
+        <td>{% if lab.is_published %}иә{% else %}жоқ{% endif %}</td>
+        <td>{{ lab.submissions.count }}</td>
+        <td class="small"><a href="{% url 'labs:teacher_lab_edit' lab_id=lab.id %}">өңдеу →</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">Зертхана жоқ. <a href="{% url 'labs:teacher_lab_new' %}">Қазір қосыңыз →</a></div>
+  {% endif %}
+</section>
+
+<section style="margin-top: 32px;">
+  <h2 class="section-title">Соңғы сабақтар</h2>
+  {% if sessions %}
+  <table class="tbl">
+    <thead>
+      <tr><th>Код</th><th>Зертхана</th><th>Атауы</th><th>Белсенді</th><th>Жауаптар</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for s in sessions %}
+      <tr>
+        <td class="mono"><a href="{% url 'labs:teacher_session_detail' code=s.code %}">{{ s.code }}</a></td>
+        <td>{{ s.lab.title }}</td>
+        <td>{{ s.title|default:"—" }}</td>
+        <td>{% if s.is_active %}<span class="pill ok">иә</span>{% else %}<span class="pill fail">жоқ</span>{% endif %}</td>
+        <td>{{ s.submissions.count }}</td>
+        <td class="small"><a href="{% url 'labs:teacher_session_detail' code=s.code %}">көру →</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p style="margin-top: 10px;"><a class="small" href="{% url 'labs:teacher_sessions' %}">Барлық сабақтар →</a></p>
+  {% else %}
+  <div class="empty">Сабақ жоқ. <a href="{% url 'labs:teacher_session_new' %}">Қазір бастаңыз →</a></div>
+  {% endif %}
+</section>
+{% endblock %}
